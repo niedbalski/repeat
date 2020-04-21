@@ -1,0 +1,24 @@
+collections:
+  lsof:
+    command: echo foo && exit -1
+    timeout: 3s
+    run-every: 10s
+    exit-codes: 0
+
+  sleep:
+    command: sleep 120
+    run-every: 1s
+    exit-codes: any
+
+  sockstat:
+    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat > sockets.txt
+    run-every: 2s
+    exit-codes: 0
+
+  sar:
+    run-once: true
+    exit-codes: 0
+    script: |
+      #!/bin/bash
+
+      sar -n EDEV -n SOCK 1
