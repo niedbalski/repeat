@@ -13,7 +13,7 @@ type Config struct {
 
 type Collection struct {
 	Command   string `yaml:"command"`
-	RunEvery  string `yaml:"run-every"`
+	RunEvery  string `yaml:"run-every" default:"0s"`
 	Timeout   string `yaml:"timeout" default:"0s"`
 	RunOnce   bool   `yaml:"run-once" default:"false"`
 	Script    string `yaml:"script"`
@@ -35,9 +35,10 @@ func NewConfigFromFile(path string) (*Config, error) {
 		if err := defaults.Set(&collection); err != nil {
 			return nil, err
 		}
-		if collection.RunOnce && collection.RunEvery != "" {
-			return nil, fmt.Errorf("collection: %s must be defined as run-once or run-every, not both", name)
+		if collection.Command != "" && collection.Script != "" {
+			return nil, fmt.Errorf("command or script stanzas are mutually exclusive")
 		}
+
 		config.Collections[name] = collection
 	}
 

@@ -6,19 +6,23 @@ collections:
     exit-codes: 0
 
   sleep:
-    command: sleep 120
-    run-every: 1s
+    command: echo "howdy"
+    run-every: 2s
     exit-codes: any
 
   sockstat:
-    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat > sockets.txt
+    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
     run-every: 2s
     exit-codes: 0
 
   sar:
     run-once: true
-    exit-codes: 0
+    exit-codes: 0 127 126
     script: |
       #!/bin/bash
 
-      sar -n EDEV -n SOCK 1
+      echo "testing"
+
+  uname:
+    script: |
+      uname -a

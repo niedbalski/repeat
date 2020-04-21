@@ -8,10 +8,10 @@ import (
 
 func main() {
 	var (
-		logLevel = kingpin.Flag("loglevel", "Log level: [debug, info, warn, error, fatal]").Short('l').Default("info").String()
-		timeout  = kingpin.Flag("timeout", "Timeout: overall timeout for all collectors").Short('t').Default("0s").Duration()
-		config   = kingpin.Flag("config", "Path to collectors configuration file").Short('c').Required().String()
-		baseDir  = kingpin.Flag("basedir", "Temporary base directory to create the resulting collection tarball").Short('b').Default("/tmp").String()
+		logLevel   = kingpin.Flag("loglevel", "Log level: [debug, info, warn, error, fatal]").Short('l').Default("info").String()
+		timeout    = kingpin.Flag("timeout", "Timeout: overall timeout for all collectors").Short('t').Default("0s").Duration()
+		config     = kingpin.Flag("config", "Path to collectors configuration file").Short('c').Required().String()
+		baseDir    = kingpin.Flag("basedir", "Temporary base directory to create the resulting collection tarball").Short('b').Default("/tmp").String()
 		resultsDir = kingpin.Flag("results-dir", "Directory to store the resulting collection tarball").Short('r').Default(".").String()
 	)
 

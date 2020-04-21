@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 func CreateTarball(tarballFilePath string, filePaths []string) error {
@@ -46,7 +47,7 @@ func addFileToTarWriter(filePath string, tarWriter *tar.Writer) error {
 	}
 
 	header := &tar.Header{
-		Name:    filePath,
+		Name:    filepath.Join(filepath.Base(filepath.Dir(filePath)), filepath.Base(filePath)),
 		Size:    stat.Size(),
 		Mode:    int64(stat.Mode()),
 		ModTime: stat.ModTime(),
