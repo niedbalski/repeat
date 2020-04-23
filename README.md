@@ -5,16 +5,19 @@ of those commands into a compressed tarball report for further analysis.
 
 ### Installation
 
-The exporter is available on the https://snapcraft.io/repeat
-
-For installing the latest master build (edge channel):
+Release artifacts can be found in the releases section [Github Releases](https://github.com/niedbalski/repeat/releases)
 ```shell script
-snap install --channel edge repeat
+wget -c https://github.com/niedbalski/repeat/releases/download/v0.0.1/repeat-0.0.1.linux-amd64.tar.gz -O - | tar -xz
+./repeat-0.0.1.linux-amd64/repeat --help
+```
+For installing the latest master build snap (edge channel):
+```shell script
+snap install --channel edge repeat --classic
 ```
 
-For installing the latest stable version (stable channel):
+For installing the latest stable version snap (stable channel):
 ```shell script
-snap install --channel stable repeat
+snap install --channel stable repeat --classic
 ```
 
 Also docker images are available:

@@ -3,12 +3,62 @@ base: core18 # the base snap is the execution environment for this snap
 
 summary: Utility to run and repeat commands and capture its output.
 description: |
-  repeat allows you to define a set of linux commands that needs
-  to be run with a given periodicity and gather the output of
-  those commands into a compressed tarball report.
+  ### Description
 
-  Example usage:
-  repeat --config ./metrics.yaml --results-dir=.
+  *repeat* allows you to define a set of linux commands that needs to be run with a given periodicity and gather the output
+  of those commands into a compressed tarball report for further analysis.
+
+  ```shell script
+  usage: repeat --config=CONFIG [<flags>]
+
+  Flags:
+    -h, --help             Show context-sensitive help (also try --help-long and --help-man).
+    -l, --loglevel="info"  Log level: [debug, info, warn, error, fatal]
+    -t, --timeout=0s       Timeout: overall timeout for all collectors
+    -c, --config=CONFIG    Path to collectors configuration file
+    -b, --basedir="/tmp"   Temporary base directory to create the resulting collection tarball
+    -r, --results-dir="."  Directory to store the resulting collection tarball
+
+  ```
+  #### Example configuration
+  ```yaml
+    collections:
+      lsof:
+        command: lsof -i # command to run
+        run-every: 10s  # periodicity
+        exit-codes: 0 # allowed exit codes (space separed list of accepted exit codes)
+        timeout: 30s   # define a per command timeout
+
+      sockstat:
+        command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
+        run-every: 2s
+        exit-codes: any
+
+      sar:
+        run-once: true   #it can be run a single time
+        exit-codes: 0 127 126
+        script: |    # a script can be given instead of a command.
+          #!/bin/bash
+
+          sar -n EDEV && true
+
+      uname:
+        run-once: true
+        script: |
+          netstat -atn
+  ```
+
+  #### Running with configuration
+
+  An example of running the collection for 5s (could be expressed in s,m,hours)
+
+  ```shell script
+  repeat --config metrics.yaml --timeout=5s --results-dir=.
+  ```
+  ### Contributing
+
+  Feel free to send PR(s) or reach niedbalski on #freenode or Telegram.
+  https://github.com/niedbalski/repeat.
 
 adopt-info: repeat
 confinement: strict
