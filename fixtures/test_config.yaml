@@ -1,0 +1,24 @@
+collections:
+  test:
+    command: echo foo && exit -1
+    timeout: 3s
+    run-every: 10s
+    exit-codes: 0
+  test1:
+    command: echo "howdy"
+    run-every: 2s
+    exit-codes: any
+  test2:
+    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
+    run-every: 2s
+    exit-codes: 0
+  test3:
+    run-once: true
+    exit-codes: 0 127 126
+    script: |
+      #!/bin/bash
+
+      echo "testing"
+  test4:
+    script: |
+      uname -a

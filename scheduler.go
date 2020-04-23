@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -20,14 +21,29 @@ import (
 const DEFAULT_REPORT_PREFIX = "repeat-"
 const DEFAULT_ANY_EXIT_CODE = "any"
 
+var ExecCommand = exec.Command
+var ExecCommandContext = exec.CommandContext
+
 type Scheduler struct {
 	Config              *Config
 	GoCronScheduler     *gocron.Scheduler
 	Pgid                int
 	Timeout             *time.Duration
 	BaseDir, ResultsDir string
-	CollectorJobMap     map[string]*gocron.Job
+	Tasks     			map[string]*SchedulerTask
 }
+
+type SchedulerTask struct {
+	Name              string
+	RunEvery, Timeout time.Duration
+	Config            Collection
+	Pgid              int
+	Command           string
+	Job 			  *gocron.Job
+	BaseDir			  string
+}
+
+var Tempdir = ioutil.TempDir
 
 func NewScheduler(configFilename string, timeout *time.Duration, baseDir string, resultsDir string) (*Scheduler, error) {
 	var scheduler Scheduler
@@ -38,7 +54,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir string,
 		return nil, err
 	}
 
-	tempDir, err := ioutil.TempDir(baseDir, DEFAULT_REPORT_PREFIX)
+	tempDir, err := Tempdir(baseDir, DEFAULT_REPORT_PREFIX)
 	if err != nil {
 		return nil, err
 	}
@@ -53,28 +69,34 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir string,
 	scheduler.Config = config
 	scheduler.GoCronScheduler = gocron.NewScheduler(time.UTC)
 	scheduler.ResultsDir = resultsDir
-	scheduler.CollectorJobMap = make(map[string]*gocron.Job)
+	scheduler.Tasks = make(map[string]*SchedulerTask)
 
 	if timeout != nil {
 		log.Infof("Scheduler timeout set to: %f seconds", timeout.Seconds())
 		scheduler.Timeout = timeout
 	}
 
-	for name, collection := range config.Collections {
-		task, err := NewSchedulerTask(&scheduler, name, pgid, collection)
-		if err != nil {
-			return nil, err
-		}
-		log.Infof("Scheduling run of %s collector every %f secs", name, task.RunEvery.Seconds())
-		job, err := scheduler.GoCronScheduler.Every(uint64(task.RunEvery.Seconds())).Seconds().StartImmediately().Do(task.Run)
-		if err != nil {
-			return nil, err
-		}
-		scheduler.CollectorJobMap[name] = job
+	if err = scheduler.LoadTasks(); err != nil {
+		return nil, err
 	}
 
 	return &scheduler, nil
 }
+
+func (scheduler *Scheduler) LoadTasks() error {
+	var task *SchedulerTask
+	var err error
+
+	for name, collection := range scheduler.Config.Collections {
+		if task, err = NewSchedulerTask(name, scheduler.BaseDir, scheduler.Pgid, collection); err != nil {
+			return err
+		}
+		scheduler.Tasks[name] = task
+	}
+
+	return nil
+}
+
 func (scheduler *Scheduler) TarballReport() error {
 	reportFileName := filepath.Join(scheduler.ResultsDir,
 		fmt.Sprintf("%sreport-%s.tar.gz", DEFAULT_REPORT_PREFIX, time.Now().Format("2006-01-02-15-04")))
@@ -87,7 +109,6 @@ func (scheduler *Scheduler) TarballReport() error {
 	if err = CreateTarball(reportFileName, filesToAppend); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -102,7 +123,6 @@ func (scheduler *Scheduler) Cleanup() error {
 	if err := os.RemoveAll(scheduler.BaseDir); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -120,17 +140,64 @@ func (scheduler *Scheduler) HandleTimeout() {
 	}
 }
 
-func (scheduler *Scheduler) RemoveJob(name string) {
-	if job, ok := scheduler.CollectorJobMap[name]; !ok {
+func (scheduler *Scheduler) RemoveTask(name string) {
+	if task, ok := scheduler.Tasks[name]; !ok {
 		log.Debugf("Not found available task with name: %s in scheduler", name)
 	} else {
-		scheduler.GoCronScheduler.RemoveByReference(job)
+		scheduler.GoCronScheduler.RemoveByReference(task.Job)
 		log.Debugf("Removed task name: %s from scheduler", name)
 	}
 	return
 }
 
+type ioWriter interface {
+	io.Writer
+}
+
+var WriteFile = ioutil.WriteFile
+
+func (scheduler *Scheduler) RunTask(task *SchedulerTask) (string, error) {
+	var output []byte
+	var err error
+
+	if task.Timeout > 0 {
+		output, err = RunWithTimeout(task)
+	} else {
+		output, err = RunWithoutTimeout(task)
+	}
+
+	if err != nil && !task.IsValidExitCode(err) {
+		log.Errorf("Command for collector %s exited with exit code: %s - (not allowed by exit-codes config)",
+			task.Name, err.Error())
+		return "", err
+	}
+
+	outputFileName := filepath.Join(task.BaseDir, fmt.Sprintf("%s-%s", task.Name, time.Now().Format("2006-01-02-15:04:05")))
+	if err = WriteFile(outputFileName, output, 0750); err != nil {
+		log.Errorf("Error storing collection results for %s, on file: %s", task.Name, outputFileName)
+		return "", err
+	}
+
+	log.Infof("Command for collector %s, successfully ran, stored results into file: %s", task.Name, outputFileName)
+	// If its a run-once job, only run it once and then discard the job from the scheduler.
+	if task.Config.RunOnce {
+		scheduler.RemoveTask(task.Name)
+	}
+
+	return outputFileName, nil
+}
+
 func (scheduler *Scheduler) Start() error {
+
+	for name, task := range scheduler.Tasks {
+		log.Infof("Scheduling run of %s collector every %f secs", name, task.RunEvery.Seconds())
+		job, err := scheduler.GoCronScheduler.Every(uint64(task.RunEvery.Seconds())).Seconds().StartImmediately().Do(scheduler.RunTask, task)
+		if err != nil {
+			return err
+		}
+		scheduler.Tasks[name].Job = job
+	}
+
 	scheduler.GoCronScheduler.StartAsync()
 
 	if *scheduler.Timeout > 0 {
@@ -148,16 +215,7 @@ func (scheduler *Scheduler) Start() error {
 	return nil
 }
 
-type SchedulerTask struct {
-	Name              string
-	RunEvery, Timeout time.Duration
-	Config            Collection
-	Pgid              int
-	Scheduler         *Scheduler
-	Command 		  string
-}
-
-func NewSchedulerTask(scheduler *Scheduler, name string, pgid int, collection Collection) (*SchedulerTask, error) {
+func NewSchedulerTask(name, baseDir string, pgid int, collection Collection) (*SchedulerTask, error) {
 	var task SchedulerTask
 	var command string
 
@@ -176,7 +234,7 @@ func NewSchedulerTask(scheduler *Scheduler, name string, pgid int, collection Co
 	}
 
 	if collection.Script != "" {
-		fd, err := ioutil.TempFile(scheduler.BaseDir, "run-script-")
+		fd, err := ioutil.TempFile(baseDir, "run-script-")
 		if err != nil {
 			return nil, err
 		}
@@ -193,22 +251,22 @@ func NewSchedulerTask(scheduler *Scheduler, name string, pgid int, collection Co
 		command = collection.Command
 	}
 
+	task.BaseDir = baseDir
 	task.Command = command
 	task.Timeout = taskTimeout
 	task.RunEvery = runEvery
 	task.Config = collection
 	task.Name = name
 	task.Pgid = pgid
-	task.Scheduler = scheduler
 	return &task, nil
 }
 
-func IsValidExitCode(allowedExitCodes string, err error) bool {
-	if allowedExitCodes == DEFAULT_ANY_EXIT_CODE {
+func (task *SchedulerTask) IsValidExitCode(err error) bool {
+	if task.Config.ExitCodes == DEFAULT_ANY_EXIT_CODE {
 		return true
 	}
 	if exitError, ok := err.(*exec.ExitError); ok {
-		for _, exitCode := range strings.Split(allowedExitCodes, " ") {
+		for _, exitCode := range strings.Split(task.Config.ExitCodes, " ") {
 			code, _ := strconv.Atoi(exitCode)
 			if code == exitError.ExitCode() {
 				return true
@@ -218,11 +276,12 @@ func IsValidExitCode(allowedExitCodes string, err error) bool {
 	return false
 }
 
-func RunWithTimeout(task *SchedulerTask) ([]byte, error){
+
+func RunWithTimeout(task *SchedulerTask) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), task.Timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "bash", "-c", task.Command)
-	cmd.Dir = task.Scheduler.BaseDir
+	cmd := ExecCommandContext(ctx, "bash", "-c", task.Command)
+	cmd.Dir = task.BaseDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: task.Pgid}
 
 	log.Infof("Running command for collector %s", task.Name)
@@ -233,40 +292,11 @@ func RunWithTimeout(task *SchedulerTask) ([]byte, error){
 	}
 	return output, err
 }
-func RunWithoutTimeout(task *SchedulerTask) ([]byte, error){
+
+func RunWithoutTimeout(task *SchedulerTask) ([]byte, error) {
 	cmd := exec.Command("bash", "-c", task.Command)
-	cmd.Dir = task.Scheduler.BaseDir
+	cmd.Dir = task.BaseDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: task.Pgid}
 	log.Infof("Running command for collector %s", task.Name)
 	return cmd.CombinedOutput()
-}
-
-func (task *SchedulerTask) Run() {
-	var output []byte
-	var err error
-
-	if task.Timeout > 0 {
-		output, err = RunWithTimeout(task)
-	} else {
-		output, err = RunWithoutTimeout(task)
-	}
-
-	if err != nil && !IsValidExitCode(task.Config.ExitCodes, err) {
-		log.Errorf("Command for collector %s exited with exit code: %s - (not allowed by exit-codes config)",
-			task.Name, err.Error())
-		return
-	}
-
-	outputFileName := filepath.Join(task.Scheduler.BaseDir, fmt.Sprintf("%s-%s", task.Name, time.Now().Format("2006-01-02-15:04:05")))
-	if err = ioutil.WriteFile(outputFileName, output, 0750); err != nil {
-		log.Errorf("Error storing collection results for %s, on file: %s", task.Name, outputFileName)
-		return
-	}
-
-	log.Infof("Command for collector %s, successfully ran, stored results into file: %s", task.Name, outputFileName)
-	// If its a run-once job, only run it once and then discard the job from the scheduler.
-	if task.Config.RunOnce {
-		task.Scheduler.RemoveJob(task.Name)
-	}
-	return
 }
