@@ -8,20 +8,23 @@ description: |
   *repeat* allows you to define a set of linux commands that needs to be run with a given periodicity and gather the output
   of those commands into a compressed tarball report for further analysis.
 
-  ```shell script
-  usage: repeat --config=CONFIG [<flags>]
+  ```yaml
 
-  Flags:
-    -h, --help             Show context-sensitive help (also try --help-long and --help-man).
-    -l, --loglevel="info"  Log level: [debug, info, warn, error, fatal]
-    -t, --timeout=0s       Timeout: overall timeout for all collectors
-    -c, --config=CONFIG    Path to collectors configuration file
-    -b, --basedir="/tmp"   Temporary base directory to create the resulting collection tarball
-    -r, --results-dir="."  Directory to store the resulting collection tarball
+      usage: repeat --config=CONFIG [<flags>]
+
+      Flags:
+        -h, --help             Show context-sensitive help (also try --help-long and --help-man).
+        -l, --loglevel="info"  Log level: [debug, info, warn, error, fatal]
+        -t, --timeout=0s       Timeout: overall timeout for all collectors
+        -c, --config=CONFIG    Path to collectors configuration file
+        -b, --basedir="/tmp"   Temporary base directory to create the resulting collection tarball
+        -r, --results-dir="."  Directory to store the resulting collection tarball
 
   ```
   #### Example configuration
+
   ```yaml
+
     collections:
       lsof:
         command: lsof -i # command to run
@@ -46,14 +49,17 @@ description: |
         run-once: true
         script: |
           netstat -atn
+
   ```
 
   #### Running with configuration
 
   An example of running the collection for 5s (could be expressed in s,m,hours)
 
-  ```shell script
+  ```yaml
+
   repeat --config metrics.yaml --timeout=5s --results-dir=.
+
   ```
   ### Contributing
 
