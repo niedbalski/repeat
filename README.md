@@ -1,4 +1,4 @@
-### Repeat
+# Repeat [![Build Status][buildstatus]][circleci] 
 
 *repeat* allows you to define a set of linux commands that needs to be run with a given periodicity and gather the output 
 of those commands into a compressed tarball report for further analysis.
