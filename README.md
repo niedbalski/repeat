@@ -49,7 +49,8 @@ collections:
     command: lsof -i # command to run
     run-every: 10s  # periodicity 
     exit-codes: 0 # allowed exit codes (space separed list of accepted exit codes) 
-
+    timeout: 30s   # define a per command timeout
+    
   sockstat:
     command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
     run-every: 2s
