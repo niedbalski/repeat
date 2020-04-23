@@ -12,8 +12,8 @@ description: |
 
 adopt-info: repeat
 confinement: strict
-version: "0.1"
-grade: devel
+version: "$VERSION"
+grade: "$GRADE"
 
 apps:
   repeat:
