@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -130,13 +129,15 @@ func (scheduler *Scheduler) HandleTimeout() {
 	timer := time.NewTimer(*scheduler.Timeout)
 	defer timer.Stop()
 
-	select {
-	case <-timer.C:
+	for range timer.C {
 		log.Infof("Scheduler timeout (%f) reached, cleaning up and killing process", scheduler.Timeout.Seconds())
 		if err := scheduler.Cleanup(); err != nil {
 			log.Error(err)
 		}
-		syscall.Kill(-scheduler.Pgid, syscall.SIGKILL)
+		if err := syscall.Kill(-scheduler.Pgid, syscall.SIGKILL); err != nil {
+			log.Errorf("Error killing process group: %d", scheduler.Pgid)
+			os.Exit(-1)
+		}
 	}
 }
 
@@ -147,11 +148,6 @@ func (scheduler *Scheduler) RemoveTask(name string) {
 		scheduler.GoCronScheduler.RemoveByReference(task.Job)
 		log.Debugf("Removed task name: %s from scheduler", name)
 	}
-	return
-}
-
-type ioWriter interface {
-	io.Writer
 }
 
 var WriteFile = ioutil.WriteFile
@@ -204,11 +200,12 @@ func (scheduler *Scheduler) Start() error {
 		go scheduler.HandleTimeout()
 	}
 
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGKILL, syscall.SIGTERM)
-	select {
-	case <-c:
-		scheduler.Cleanup()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	for range c {
+		if err := scheduler.Cleanup(); err != nil {
+			log.Errorf("Error during the cleanup phase: %s", err)
+		}
 		os.Exit(1)
 	}
 
@@ -295,7 +292,7 @@ func RunWithTimeout(task *SchedulerTask) ([]byte, error) {
 }
 
 func RunWithoutTimeout(task *SchedulerTask) ([]byte, error) {
-	cmd := exec.Command("bash", "-c", task.Command)
+	cmd := ExecCommand("bash", "-c", task.Command)
 	cmd.Dir = task.BaseDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: task.Pgid}
 	log.Infof("Running command for collector %s", task.Name)
