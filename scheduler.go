@@ -30,7 +30,7 @@ type Scheduler struct {
 	Pgid                int
 	Timeout             *time.Duration
 	BaseDir, ResultsDir string
-	Tasks     			map[string]*SchedulerTask
+	Tasks               map[string]*SchedulerTask
 }
 
 type SchedulerTask struct {
@@ -39,8 +39,8 @@ type SchedulerTask struct {
 	Config            Collection
 	Pgid              int
 	Command           string
-	Job 			  *gocron.Job
-	BaseDir			  string
+	Job               *gocron.Job
+	BaseDir           string
 }
 
 var Tempdir = ioutil.TempDir
@@ -215,6 +215,8 @@ func (scheduler *Scheduler) Start() error {
 	return nil
 }
 
+var TempFile = ioutil.TempFile
+
 func NewSchedulerTask(name, baseDir string, pgid int, collection Collection) (*SchedulerTask, error) {
 	var task SchedulerTask
 	var command string
@@ -234,7 +236,7 @@ func NewSchedulerTask(name, baseDir string, pgid int, collection Collection) (*S
 	}
 
 	if collection.Script != "" {
-		fd, err := ioutil.TempFile(baseDir, "run-script-")
+		fd, err := TempFile(baseDir, "run-script-")
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +277,6 @@ func (task *SchedulerTask) IsValidExitCode(err error) bool {
 	}
 	return false
 }
-
 
 func RunWithTimeout(task *SchedulerTask) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), task.Timeout)

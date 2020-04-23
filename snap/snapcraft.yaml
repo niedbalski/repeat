@@ -1,0 +1,32 @@
+name: repeat
+base: core18 # the base snap is the execution environment for this snap
+
+summary: Utility to run and repeat commands and capture its output.
+description: |
+  repeat allows you to define a set of linux commands that needs
+  to be run with a given periodicity and gather the output of
+  those commands into a compressed tarball report.
+
+  Example usage:
+  repeat --config ./metrics.yaml --results-dir=.
+
+adopt-info: repeat
+confinement: strict
+version: "0.1"
+grade: devel
+
+apps:
+  repeat:
+    command: repeat
+    plugs: [home]
+
+parts:
+  repeat:
+    plugin: go
+    source: ./
+    go-importpath: github.com/niedbalski/repeat
+    go-channel: latest/stable
+    parse-info: []
+    build-packages:
+      - git
+      - build-essential
