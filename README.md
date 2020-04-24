@@ -2,13 +2,13 @@
 
 *repeat* allows you to define a set of linux commands that needs to be run with a given periodicity and gather the output 
 of those commands into a compressed tarball report for further analysis.
-
+ 
 ### Installation
 
 Release artifacts can be found in the releases section [Github Releases](https://github.com/niedbalski/repeat/releases)
 ```shell script
-wget -c https://github.com/niedbalski/repeat/releases/download/v0.0.1/repeat-0.0.1.linux-amd64.tar.gz -O - | tar -xz
-./repeat-0.0.1.linux-amd64/repeat --help
+wget -c https://github.com/niedbalski/repeat/releases/download/v0.0.1/repeat-0.0.1.linux-amd64.tar.gz -O - | tar -xz -C . --strip=1
+./repeat --help
 ```
 For installing the latest master build snap (edge channel):
 ```shell script
@@ -26,7 +26,7 @@ Also docker images are available:
 * Arm64 docker container [![Docker Repository on Quay](https://quay.io/repository/niedbalski/repeat-linux-arm64/status "Docker Repository on Quay")](https://quay.io/repository/niedbalski/repeat-linux-arm64)
 
 ```shell script
-docker run -v "$HOME/metrics.yaml":/config.yaml -it quay.io/niedbalski/repeat-linux-amd64 --config config.yaml (params)
+docker run -v "$(pwd):/config" -it quay.io/niedbalski/repeat-linux-amd64:master --config /config/example_metrics.yaml
 ```
 
 #### Command line
