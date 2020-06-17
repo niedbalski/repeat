@@ -1,12 +1,11 @@
-collections:
-  lsof:
-    command: echo foo && exit -1
-    timeout: 3s
-    run-every: 10s
-    exit-codes: 0
+import:
+  - https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1
 
-  sleep:
-    command: echo "howdy"
+collections:
+  caca:
+    command: top
+  process_list:
+    command: ps auxh
     run-every: 2s
     exit-codes: any
 
