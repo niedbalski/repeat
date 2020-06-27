@@ -44,35 +44,6 @@ Flags:
 
 ```
 
-##### Example configuration
-
-```yaml
-collections:
-  lsof:
-    command: lsof -i # command to run
-    run-every: 10s  # periodicity 
-    exit-codes: 0 # allowed exit codes (space separed list of accepted exit codes) 
-    timeout: 30s   # define a per command timeout
-    
-  sockstat:
-    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
-    run-every: 2s
-    exit-codes: any
-
-  sar:
-    run-once: true   #it can be run a single time
-    exit-codes: 0 127 126
-    script: |    # a script can be given instead of a command.
-      #!/bin/bash
-
-      sar -n EDEV && true
-
-  uname:
-    run-once: true
-    script: |
-      netstat -atn
-```
-
 #### Running with configuration
 
 An example of running the collection for 5s (could be expressed in s,m,hours)
@@ -81,10 +52,47 @@ An example of running the collection for 5s (could be expressed in s,m,hours)
 repeat --config metrics.yaml --timeout=5s --results-dir=.
 ```
 
+##### Example configuration
+
+Note: Imports are allowed as http[s]/files, local collection names have precedence over imported ones.
+
+```yaml
+import:
+  - https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1
+  - https://raw.githubusercontent.com/niedbalski/repeat/master/logs.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd2
+  - /tmp/other_collection.yaml
+
+collections:
+  process_list:
+    command: ps auxh
+    run-every: 2s
+    exit-codes: any
+
+  sockstat:
+    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
+    run-every: 2s
+    exit-codes: 0
+
+  sar:
+    run-once: true
+    exit-codes: 0 127 126
+    script: |
+      #!/bin/bash
+
+      echo "testing"
+
+  uname:
+    run-once: true
+    script: |
+      uname -a
+```
+
 This command will generate the following output:
 
 ```shell script
+
 INFO[2020-04-23 17:57:13] Loading collectors from configuration file: example_metrics.yaml 
+DEBU[2020-04-23 17:57:13] Importing item: https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1 
 INFO[2020-04-23 17:57:13] Scheduler timeout set to: 5.000000 seconds   
 INFO[2020-04-23 17:57:13] Scheduling run of sleep collector every 2.000000 secs 
 INFO[2020-04-23 17:57:13] Scheduling run of sockstat collector every 2.000000 secs 

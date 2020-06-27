@@ -3,16 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"strings"
-
 	"github.com/go-co-op/gocron"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -44,8 +43,9 @@ type SchedulerTask struct {
 
 var Tempdir = ioutil.TempDir
 
-func NewScheduler(configFilename string, timeout *time.Duration, baseDir string, resultsDir string) (*Scheduler, error) {
+func NewScheduler(configFilename string, timeout *time.Duration, baseDir, resultsDir string) (*Scheduler, error) {
 	var scheduler Scheduler
+	var t time.Location
 
 	log.Infof("Loading collectors from configuration file: %s", configFilename)
 	config, err := NewConfigFromFile(configFilename)
@@ -66,7 +66,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir string,
 	scheduler.BaseDir = tempDir
 	scheduler.Pgid = pgid
 	scheduler.Config = config
-	scheduler.GoCronScheduler = gocron.NewScheduler(time.UTC)
+	scheduler.GoCronScheduler = gocron.NewScheduler(&t)
 	scheduler.ResultsDir = resultsDir
 	scheduler.Tasks = make(map[string]*SchedulerTask)
 
@@ -78,7 +78,6 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir string,
 	if err = scheduler.LoadTasks(); err != nil {
 		return nil, err
 	}
-
 	return &scheduler, nil
 }
 
