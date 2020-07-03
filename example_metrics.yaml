@@ -1,19 +1,10 @@
-import:
-  - https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1
-
 collections:
-  caca:
-    command: top
-  process_list:
-    command: ps auxh
-    run-every: 2s
-    exit-codes: any
-
-  sockstat:
-    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
+  tcp_mem:
+    command: cat /proc/sys/net/ipv4/tcp*mem
     run-every: 2s
     exit-codes: 0
 
+  # scripts can be defined inline
   sar:
     run-once: true
     exit-codes: 0 127 126
@@ -22,6 +13,40 @@ collections:
 
       echo "testing"
 
-  uname:
-    script: |
-      uname -a
+  process_list:
+    command: ps aux --no-headers
+    run-every: 1s
+    exit-codes: any
+    # store type database, will create a table in the collections database
+    # and use the map-values definition to populate each column for th given
+    # command output
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: rss
+            type: int
+            field-index: 5
+          - name: vsz
+            type: int
+            field-index: 4
+          - name: pid
+            type: string
+            field-index: 1
+
+  sockstat_tcp:
+    command: grep -i tcp /proc/net/sockstat
+    run-every: 1s
+    exit-codes: any
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+          - name: alloc
+            type: int
+            field-index: 8

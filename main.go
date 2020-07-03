@@ -13,6 +13,7 @@ func main() {
 		config     = kingpin.Flag("config", "Path to collectors configuration file").Short('c').Required().String()
 		baseDir    = kingpin.Flag("basedir", "Temporary base directory to create the resulting collection tarball").Short('b').Default("/tmp").String()
 		resultsDir = kingpin.Flag("results-dir", "Directory to store the resulting collection tarball").Short('r').Default(".").String()
+		dbDir      = kingpin.Flag("db-dir", "Path to store the local results database").Default(".").String()
 	)
 
 	kingpin.HelpFlag.Short('h')
@@ -32,7 +33,7 @@ func main() {
 	log.SetLevel(parsedLogLevel)
 	log.SetOutput(os.Stdout)
 
-	scheduler, err := NewScheduler(*config, timeout, *baseDir, *resultsDir)
+	scheduler, err := NewScheduler(*config, timeout, *baseDir, *resultsDir, *dbDir)
 	if err != nil {
 		log.Errorf("Cannot enable scheduler, exiting, error: %s", err.Error())
 		os.Exit(-1)

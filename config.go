@@ -10,25 +10,54 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/url"
+	"sort"
 	"strings"
 )
 
 type MapValueField struct {
 	Name  string `yaml:"name"`
 	Type  string `yaml:"type" default:""`
-	Index string `yaml:"idx"`
+	Index int    `yaml:"field-index"`
+}
+
+func (field *MapValueField) Format(values []string) string {
+	switch field.Type {
+	case "string":
+		return "'" + values[field.Index] + "'"
+	default:
+		return values[field.Index]
+	}
 }
 
 type MapValue struct {
-	Separator       string          `yaml:"separator" default:","`
-	AppendTimestamp bool            `yaml:"add-timestamp" default:"false"`
+	Separator       string          `yaml:"field-separator" default:","`
+	AppendTimestamp bool            `yaml:"add-timestamp" default:"true"`
 	Fields          []MapValueField `yaml:"fields"`
 	IgnoreRegex     string          `yaml:"ignore-regex,omitempty"`
+}
+
+func (mv *MapValue) SortFieldsByIndex() {
+	sort.Slice(mv.Fields, func(i, j int) bool {
+		return mv.Fields[i].Index < mv.Fields[j].Index
+	})
 }
 
 type DBConfig struct {
 	MapValues MapValue `yaml:"map-values,omitempty"`
 	Name      string   `yaml:"name,omitempty"`
+}
+
+func (c *DBConfig) SetDefaults() error {
+	c.MapValues.SortFieldsByIndex()
+	for i, f := range c.MapValues.Fields {
+		for j, ff := range c.MapValues.Fields {
+			if i != j && f.Name == ff.Name {
+				return fmt.Errorf("duplicate field name: %s - idx: %d and idx: %d, please rename one of them",
+					f.Name, i, j)
+			}
+		}
+	}
+	return nil
 }
 
 type Collection struct {
@@ -49,6 +78,13 @@ func (c *Collection) SetDefaults() error {
 	if c.Command != "" && c.Script != "" {
 		return fmt.Errorf("command or script stanzas are mutually exclusive")
 	}
+
+	if len(c.Database.MapValues.Fields) > 0 {
+		if err := c.Database.SetDefaults(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -139,7 +175,7 @@ func LoadConfig(config *Config, urlFetcher func(url string) ([]byte, error)) err
 
 	for name, collection := range config.Collections {
 		if err := collection.SetDefaults(); err != nil {
-			return err
+			return fmt.Errorf("cannot set defaults on collection: %s , reason: %s", name, err)
 		}
 		log.Infof("collection: %s added", name)
 		config.Collections[name] = collection

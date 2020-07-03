@@ -1,8 +1,12 @@
 # Repeat [![CircleCI](https://circleci.com/gh/niedbalski/repeat.svg?style=svg)](https://circleci.com/gh/niedbalski/repeat)
 
-*repeat* allows you to define a set of linux commands that needs to be run with a given periodicity and gather the output 
-of those commands into a compressed tarball report for further analysis.
- 
+*repeat* is a data collection tool for linux, with the following features:
+
+* Collections (command runs) can be run on a given time periodicity or a single shot.
+* Command output can be processed and stored on files or on a local database for further analysis. 
+* Collections can be shared through imports (local or via http[s]+)
+* A compressed tarball report will be generated.
+
 ### Installation
 
 Release artifacts can be found in the releases section [Github Releases](https://github.com/niedbalski/repeat/releases)
@@ -41,7 +45,7 @@ Flags:
   -c, --config=CONFIG    Path to collectors configuration file
   -b, --basedir="/tmp"   Temporary base directory to create the resulting collection tarball
   -r, --results-dir="."  Directory to store the resulting collection tarball
-
+      --db-dir="."       Path to store the local results database 
 ```
 
 #### Running with configuration
@@ -52,27 +56,22 @@ An example of running the collection for 5s (could be expressed in s,m,hours)
 repeat --config metrics.yaml --timeout=5s --results-dir=.
 ```
 
-##### Example configuration
+#### Example configuration
 
-Note: Imports are allowed as http[s]/files, local collection names have precedence over imported ones.
+* *Note* : Imports are allowed as http[s]/files, local collection names have precedence over imported ones.
+* *Note2* : database storage and fields configuration are totally user-defined.
 
 ```yaml
 import:
   - https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1
-  - https://raw.githubusercontent.com/niedbalski/repeat/master/logs.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd2
-  - /tmp/other_collection.yaml
 
 collections:
-  process_list:
-    command: ps auxh
-    run-every: 2s
-    exit-codes: any
-
-  sockstat:
-    command: cat /proc/sys/net/ipv4/tcp*mem /proc/net/sockstat
+  tcp_mem:
+    command: cat /proc/sys/net/ipv4/tcp*mem
     run-every: 2s
     exit-codes: 0
 
+  # scripts can be defined inline
   sar:
     run-once: true
     exit-codes: 0 127 126
@@ -81,49 +80,74 @@ collections:
 
       echo "testing"
 
-  uname:
-    run-once: true
-    script: |
-      uname -a
+  process_list:
+    command: ps aux --no-headers
+    run-every: 1s
+    exit-codes: any
+    # store type database, will create a table in the collections database
+    # and use the map-values definition to populate each column for th given
+    # command output
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: rss
+            type: int
+            field-index: 5
+          - name: vsz
+            type: int
+            field-index: 4
+          - name: pid
+            type: string
+            field-index: 1
+
+  sockstat_tcp:
+    command: grep -i tcp /proc/net/sockstat
+    run-every: 1s
+    exit-codes: any
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+          - name: alloc
+            type: int
+            field-index: 8
 ```
 
-This command will generate the following output:
+This command will generate the following report structure:
 
 ```shell script
-
-INFO[2020-04-23 17:57:13] Loading collectors from configuration file: example_metrics.yaml 
-DEBU[2020-04-23 17:57:13] Importing item: https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1 
-INFO[2020-04-23 17:57:13] Scheduler timeout set to: 5.000000 seconds   
-INFO[2020-04-23 17:57:13] Scheduling run of sleep collector every 2.000000 secs 
-INFO[2020-04-23 17:57:13] Scheduling run of sockstat collector every 2.000000 secs 
-INFO[2020-04-23 17:57:13] Scheduling run of sar collector every 0.000000 secs 
-INFO[2020-04-23 17:57:13] Scheduling run of uname collector every 0.000000 secs 
-INFO[2020-04-23 17:57:13] Scheduling run of lsof collector every 10.000000 secs 
-INFO[2020-04-23 17:57:14] Running command for collector sleep          
-INFO[2020-04-23 17:57:14] Running command for collector uname          
-INFO[2020-04-23 17:57:14] Running command for collector lsof           
-INFO[2020-04-23 17:57:14] Running command for collector sar            
-INFO[2020-04-23 17:57:14] Running command for collector sockstat       
-INFO[2020-04-23 17:57:14] Command for collector sleep, successfully ran, stored results into file: /tmp/repeat-044825910/sleep-2020-04-23-17:57:14 
-INFO[2020-04-23 17:57:14] Command for collector uname, successfully ran, stored results into file: /tmp/repeat-044825910/uname-2020-04-23-17:57:14 
-ERRO[2020-04-23 17:57:14] Command for collector lsof exited with exit code: exit status 255 - (not allowed by exit-codes config) 
-INFO[2020-04-23 17:57:14] Command for collector sar, successfully ran, stored results into file: /tmp/repeat-044825910/sar-2020-04-23-17:57:14 
-INFO[2020-04-23 17:57:14] Command for collector sockstat, successfully ran, stored results into file: /tmp/repeat-044825910/sockstat-2020-04-23-17:57:14 
-INFO[2020-04-23 17:57:15] Running command for collector uname          
-INFO[2020-04-23 17:57:15] Command for collector uname, successfully ran, stored results into file: /tmp/repeat-044825910/uname-2020-04-23-17:57:15 
-INFO[2020-04-23 17:57:16] Running command for collector sockstat       
-INFO[2020-04-23 17:57:16] Running command for collector uname          
-INFO[2020-04-23 17:57:16] Running command for collector sleep          
-INFO[2020-04-23 17:57:16] Command for collector sockstat, successfully ran, stored results into file: /tmp/repeat-044825910/sockstat-2020-04-23-17:57:16 
-INFO[2020-04-23 17:57:16] Command for collector sleep, successfully ran, stored results into file: /tmp/repeat-044825910/sleep-2020-04-23-17:57:16 
-INFO[2020-04-23 17:57:16] Command for collector uname, successfully ran, stored results into file: /tmp/repeat-044825910/uname-2020-04-23-17:57:16 
-INFO[2020-04-23 17:57:17] Running command for collector uname          
-INFO[2020-04-23 17:57:17] Command for collector uname, successfully ran, stored results into file: /tmp/repeat-044825910/uname-2020-04-23-17:57:17 
-INFO[2020-04-23 17:57:18] Scheduler timeout (5.000000) reached, cleaning up and killing process 
-INFO[2020-04-23 17:57:18] Cleaning up resources                        
-INFO[2020-04-23 17:57:18] Creating report tarball at: repeat-report-2020-04-23-17-57.tar.gz  
-Killed
+$ tar -xvf repeat-report-2020-07-04-00-05.tar.gz 
+repeat-077356600/collections.db
+repeat-077356600/collections.db-journal
+repeat-077356600/run-script-557986359
+repeat-077356600/sar-2020-07-04-00:05:04
+repeat-077356600/tcp_mem-2020-07-04-00:05:04
+repeat-077356600/tcp_mem-2020-07-04-00:05:06
+repeat-077356600/tcp_mem-2020-07-04-00:05:08
+repeat-077356600/tcp_mem-2020-07-04-00:05:10
+repeat-077356600/tcp_mem-2020-07-04-00:05:12
+repeat-077356600/tcp_mem-2020-07-04-00:05:14
 ```
+* Each file represents a single command run on the given periodicity
+* Collections with storage type of database, will store its results in the corresponding tables,
+as an example:
+
+```shell script
+$ sqlite3 repeat-077356600/collections.db 
+SQLite version 3.31.1 2020-01-27 19:55:54
+Enter ".help" for usage hints.
+sqlite> select avg(rss) from process_list;
+9837.64936336925
+sqlite> select min(inuse), max(inuse), avg(inuse) from sockstat_tcp;
+23|23|23.0
+```
+
 
 ### Contributing
 
