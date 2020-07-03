@@ -25,7 +25,7 @@ func NewDBStorage(dBPath string) (*DBStorage, error) {
 
 func (db *DBStorage) CreateTable(tableName string, fields []MapValueField) {
 	log.Debugf("Creating table: %s on database", tableName)
-	if ok, _ := db.Tables[tableName]; ok {
+	if _, ok := db.Tables[tableName]; ok {
 		log.Debugf("Table %s already exists, skipping", tableName)
 		return
 	}
