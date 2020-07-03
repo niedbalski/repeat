@@ -2,8 +2,6 @@ import:
   - https://raw.githubusercontent.com/niedbalski/repeat/master/example_metrics.yaml#md5sum=6c5b5d8fafd343d5cf452a7660ad9dd1
 
 collections:
-  caca:
-    command: top
   process_list:
     command: ps auxh
     run-every: 2s
