@@ -27,10 +27,11 @@ snap install --channel stable repeat --classic
 Also docker images are available:
 
 * Amd64 docker container [![Docker Repository on Quay](https://quay.io/repository/niedbalski/repeat-linux-amd64/status "Docker Repository on Quay")](https://quay.io/repository/niedbalski/repeat-linux-amd64)
-* Arm64 docker container [![Docker Repository on Quay](https://quay.io/repository/niedbalski/repeat-linux-arm64/status "Docker Repository on Quay")](https://quay.io/repository/niedbalski/repeat-linux-arm64)
 
 ```shell script
-docker run -v "$(pwd):/config" -it quay.io/niedbalski/repeat-linux-amd64:master --config /config/example_metrics.yaml
+docker run -v "$(pwd):/config" -it quay.io/niedbalski/repeat-linux-amd64:master --config * Arm64 docker container [![Docker Repository on Quay](https://quay.io/repository/niedbalski/repeat-linux-arm64/status "Docker Repository on Quay")](https://quay.io/repository/niedbalski/repeat-linux-arm64)
+31
+/config/example_metrics.yaml
 ```
 
 #### Command line
