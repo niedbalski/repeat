@@ -23,12 +23,13 @@ var ExecCommand = exec.Command
 var ExecCommandContext = exec.CommandContext
 
 type Scheduler struct {
-	Config              *Config
-	GoCronScheduler     *gocron.Scheduler
-	Pgid                int
-	Timeout             *time.Duration
-	BaseDir, ResultsDir string
-	Tasks               map[string]*SchedulerTask
+	Config                     *Config
+	DBStorage                  *DBStorage
+	GoCronScheduler            *gocron.Scheduler
+	Pgid                       int
+	Timeout                    *time.Duration
+	DBDir, BaseDir, ResultsDir string
+	Tasks                      map[string]*SchedulerTask
 }
 
 type SchedulerTask struct {
@@ -39,11 +40,12 @@ type SchedulerTask struct {
 	Command           string
 	Job               *gocron.Job
 	BaseDir           string
+	DBStorage         *DBStorage
 }
 
 var Tempdir = ioutil.TempDir
 
-func NewScheduler(configFilename string, timeout *time.Duration, baseDir, resultsDir string) (*Scheduler, error) {
+func NewScheduler(configFilename string, timeout *time.Duration, baseDir, resultsDir, dbDir string) (*Scheduler, error) {
 	var scheduler Scheduler
 	var t time.Location
 
@@ -69,6 +71,13 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir, result
 	scheduler.GoCronScheduler = gocron.NewScheduler(&t)
 	scheduler.ResultsDir = resultsDir
 	scheduler.Tasks = make(map[string]*SchedulerTask)
+	scheduler.DBDir = dbDir
+
+	storage, err := NewDBStorage(scheduler.BaseDir)
+	if err != nil {
+		return nil, err
+	}
+	scheduler.DBStorage = storage
 
 	if timeout != nil {
 		log.Infof("Scheduler timeout set to: %f seconds", timeout.Seconds())
@@ -78,6 +87,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir, result
 	if err = scheduler.LoadTasks(); err != nil {
 		return nil, err
 	}
+
 	return &scheduler, nil
 }
 
@@ -86,12 +96,11 @@ func (scheduler *Scheduler) LoadTasks() error {
 	var err error
 
 	for name, collection := range scheduler.Config.Collections {
-		if task, err = NewSchedulerTask(name, scheduler.BaseDir, scheduler.Pgid, collection); err != nil {
+		if task, err = NewSchedulerTask(name, scheduler.BaseDir, scheduler.Pgid, scheduler.DBDir, collection, scheduler.DBStorage); err != nil {
 			return err
 		}
 		scheduler.Tasks[name] = task
 	}
-
 	return nil
 }
 
@@ -151,9 +160,14 @@ func (scheduler *Scheduler) RemoveTask(name string) {
 
 var WriteFile = ioutil.WriteFile
 
-func (scheduler *Scheduler) RunTask(task *SchedulerTask) (string, error) {
+func (scheduler *Scheduler) RunTask(task *SchedulerTask) error {
 	var output []byte
 	var err error
+
+	// If its a run-once job, only run it once and then discard the job from the scheduler.
+	if task.Config.RunOnce {
+		scheduler.RemoveTask(task.Name)
+	}
 
 	if task.Timeout > 0 {
 		output, err = RunWithTimeout(task)
@@ -162,24 +176,23 @@ func (scheduler *Scheduler) RunTask(task *SchedulerTask) (string, error) {
 	}
 
 	if err != nil && !task.IsValidExitCode(err) {
-		log.Errorf("Command for collector %s exited with exit code: %s - (not allowed by exit-codes config)",
+		errMsg := fmt.Errorf("Command for collector %s exited with exit code: %s - (not allowed by exit-codes config)",
 			task.Name, err.Error())
-		return "", err
+		log.Error(errMsg)
+		return errMsg
 	}
 
-	outputFileName := filepath.Join(task.BaseDir, fmt.Sprintf("%s-%s", task.Name, time.Now().Format("2006-01-02-15:04:05")))
-	if err = WriteFile(outputFileName, output, 0750); err != nil {
-		log.Errorf("Error storing collection results for %s, on file: %s", task.Name, outputFileName)
-		return "", err
+	switch task.Config.Store {
+	case "database":
+		{
+			return task.StoreResultsToDB(output)
+		}
+	case "file":
+		{
+			return task.StoreResultsToFile(output)
+		}
 	}
-
-	log.Infof("Command for collector %s, successfully ran, stored results into file: %s", task.Name, outputFileName)
-	// If its a run-once job, only run it once and then discard the job from the scheduler.
-	if task.Config.RunOnce {
-		scheduler.RemoveTask(task.Name)
-	}
-
-	return outputFileName, nil
+	return nil
 }
 
 func (scheduler *Scheduler) Start() error {
@@ -207,13 +220,12 @@ func (scheduler *Scheduler) Start() error {
 		}
 		os.Exit(1)
 	}
-
 	return nil
 }
 
 var TempFile = ioutil.TempFile
 
-func NewSchedulerTask(name, baseDir string, pgid int, collection Collection) (*SchedulerTask, error) {
+func NewSchedulerTask(name, baseDir string, pgid int, dbDir string, collection Collection, dBStorage *DBStorage) (*SchedulerTask, error) {
 	var task SchedulerTask
 	var command string
 
@@ -256,6 +268,7 @@ func NewSchedulerTask(name, baseDir string, pgid int, collection Collection) (*S
 	task.Config = collection
 	task.Name = name
 	task.Pgid = pgid
+	task.DBStorage = dBStorage
 	return &task, nil
 }
 
@@ -272,6 +285,30 @@ func (task *SchedulerTask) IsValidExitCode(err error) bool {
 		}
 	}
 	return false
+}
+
+func (task *SchedulerTask) StoreResultsToDB(results []byte) error {
+	tableName := strings.ToLower(task.Name)
+	for _, line := range strings.Split(string(results), "\n") {
+		values := strings.Split(line, task.Config.Database.MapValues.Separator)
+		fields := task.Config.Database.MapValues.Fields
+		task.DBStorage.CreateTable(tableName, fields)
+		if err := task.DBStorage.CreateRecord(tableName, fields, values); err != nil {
+			return err
+		}
+	}
+	log.Infof("Command for collector %s, successfully ran, stored results into database, table: %s", task.Name, tableName)
+	return nil
+}
+
+func (task *SchedulerTask) StoreResultsToFile(results []byte) error {
+	outputFileName := filepath.Join(task.BaseDir, fmt.Sprintf("%s-%s", task.Name, time.Now().Format("2006-01-02-15:04:05")))
+	if err := WriteFile(outputFileName, results, 0750); err != nil {
+		log.Errorf("Error storing collection results for %s, on file: %s", task.Name, outputFileName)
+		return err
+	}
+	log.Infof("Command for collector %s, successfully ran, stored results into file: %s", task.Name, outputFileName)
+	return nil
 }
 
 func RunWithTimeout(task *SchedulerTask) ([]byte, error) {

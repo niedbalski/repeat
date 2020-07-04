@@ -60,16 +60,18 @@ func init() {
 }
 
 func TestRunSchedulerTask(t *testing.T) {
-	scheduler, err := NewScheduler(DefaultConfigPath, &DefaultSchedulerTimeOut, DefaultBaseDir, DefaultBaseDir)
+	scheduler, err := NewScheduler(DefaultConfigPath, &DefaultSchedulerTimeOut, DefaultBaseDir, DefaultBaseDir, ".")
 	assert.Nil(t, err)
 	assert.Len(t, scheduler.Tasks, 5)
 
 	defer os.RemoveAll(scheduler.ResultsDir)
 
-	outputFilename, err := scheduler.RunTask(scheduler.Tasks["test"])
+	err = scheduler.RunTask(scheduler.Tasks["test"])
 	assert.Nil(t, err)
-	assert.FileExists(t, outputFilename)
 
-	output, _ := ioutil.ReadFile(outputFilename)
+	files, _ := filepath.Glob(scheduler.BaseDir + "/test*")
+	assert.NotEmpty(t, files)
+	assert.FileExists(t, files[0])
+	output, _ := ioutil.ReadFile(files[0])
 	assert.EqualValues(t, output, []byte(DEFAULT_COMMAND_OUTPUT))
 }
