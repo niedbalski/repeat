@@ -73,7 +73,7 @@ PROMU_VERSION ?= 0.4.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
 GOLANGCI_LINT :=
-GOLANGCI_LINT_OPTS ?=
+GOLANGCI_LINT_OPTS ?= --timeout 10m
 GOLANGCI_LINT_VERSION ?= v1.24.0
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
 # windows isn't included here because of the path separator being different.
