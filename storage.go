@@ -31,9 +31,18 @@ func (db *DBStorage) CreateTable(tableName string, fields []MapValueField) {
 	}
 
 	instance := dynamicstruct.ExtendStruct(gorm.Model{})
+
 	for _, field := range fields {
-		instance.AddField(Capitalize(field.Name), field.Type, "")
+		if field.Type == "float" {
+			instance.AddField(Capitalize(field.Name), 0.0, "")
+		} else if field.Type == "int" {
+			instance.AddField(Capitalize(field.Name), 0, "")
+		} else {
+			//defaults to string type
+			instance.AddField(Capitalize(field.Name), field.Type, "")
+		}
 	}
+
 	newInst := instance.Build().New()
 
 	table := db.Table(tableName)
@@ -54,6 +63,7 @@ func (db *DBStorage) CreateRecord(tableName string, fields []MapValueField, valu
 		var formattedValues []string
 		var dst strings.Builder
 
+		fieldNames = append(fieldNames, "created_at")
 		for _, field := range fields {
 			fieldNames = append(fieldNames, field.Name)
 		}
@@ -64,6 +74,7 @@ func (db *DBStorage) CreateRecord(tableName string, fields []MapValueField, valu
 		dst.WriteString(strings.Join(fieldNames, ", "))
 		dst.WriteString(") VALUES (")
 
+		formattedValues = append(formattedValues, "datetime('now')")
 		for _, field := range fields {
 			formattedValues = append(formattedValues, field.Format(values))
 		}

@@ -130,25 +130,20 @@ repeat-077356600/run-script-557986359
 repeat-077356600/sar-2020-07-04-00:05:04
 repeat-077356600/tcp_mem-2020-07-04-00:05:04
 repeat-077356600/tcp_mem-2020-07-04-00:05:06
-repeat-077356600/tcp_mem-2020-07-04-00:05:08
-repeat-077356600/tcp_mem-2020-07-04-00:05:10
+[...]
 repeat-077356600/tcp_mem-2020-07-04-00:05:12
 repeat-077356600/tcp_mem-2020-07-04-00:05:14
 ```
-* Each file represents a single command run on the given periodicity
-* Collections with storage type of database, will store its results in the corresponding tables,
-as an example:
+### Visualizing stored data with pandas.
 
-```shell script
-$ sqlite3 repeat-077356600/collections.db 
-SQLite version 3.31.1 2020-01-27 19:55:54
-Enter ".help" for usage hints.
-sqlite> select avg(rss) from process_list;
-9837.64936336925
-sqlite> select min(inuse), max(inuse), avg(inuse) from sockstat_tcp;
-23|23|23.0
-```
+There is an example file called [Example pandas notebook](example-repeat-pandas.ipynb) that can be
+used with Jupyter.
 
+Use this helper to generate dataframes from the report's tarball [pandas helper](repeat_pandas.py). 
+*Note*: python3-sqlalchemy and pandas are required. (Ubuntu: apt install python3-sqlalchemy python3-pandas)
+
+
+![Getting data from a repeat report](repeat-pandas.png?raw=true "Title")
 
 ### Contributing
 
