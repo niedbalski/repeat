@@ -14,25 +14,15 @@ Release artifacts can be found in the releases section [Github Releases](https:/
 wget -c https://github.com/niedbalski/repeat/releases/download/v0.0.1/repeat-0.0.1.linux-amd64.tar.gz -O - | tar -xz -C . --strip=1
 ./repeat --help
 ```
-For installing the latest master build snap (edge channel):
+For installing the latest master build snap (edge for master or stable channel for releases):
 ```shell script
 snap install --channel edge repeat --classic
-```
-
-For installing the latest stable version snap (stable channel):
-```shell script
-snap install --channel stable repeat --classic
 ```
 
 Also docker images are available:
 
 * Amd64 docker container [![Docker Repository on Quay](https://quay.io/repository/niedbalski/repeat-linux-amd64/status "Docker Repository on Quay")](https://quay.io/repository/niedbalski/repeat-linux-amd64)
 
-```shell script
-docker run -v "$(pwd):/config" -it quay.io/niedbalski/repeat-linux-amd64:master --config * Arm64 docker container [![Docker Repository on Quay](https://quay.io/repository/niedbalski/repeat-linux-arm64/status "Docker Repository on Quay")](https://quay.io/repository/niedbalski/repeat-linux-arm64)
-31
-/config/example_metrics.yaml
-```
 
 #### Command line
 
@@ -144,6 +134,10 @@ Use this helper to generate dataframes from the report's tarball [pandas helper]
 
 
 ![Getting data from a repeat report](repeat-pandas.png?raw=true "Title")
+
+### Curated list of collections
+
+Repeat also maintains a curated list of collections that can be found [collections](./collections/)
 
 ### Contributing
 
