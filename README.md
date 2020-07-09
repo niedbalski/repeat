@@ -11,7 +11,7 @@
 
 Release artifacts can be found in the releases section [Github Releases](https://github.com/niedbalski/repeat/releases)
 ```shell script
-wget -c https://github.com/niedbalski/repeat/releases/download/v0.0.1/repeat-0.0.1.linux-amd64.tar.gz -O - | tar -xz -C . --strip=1
+wget -c https://github.com/niedbalski/repeat/releases/download/v0.0.3/repeat-0.0.3.linux-amd64.tar.gz -O - | tar -xz -C . --strip=1
 ./repeat --help
 ```
 For installing the latest master build snap (edge for master or stable channel for releases):
