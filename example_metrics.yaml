@@ -1,3 +1,5 @@
+import:
+  - ./collections/lxc.yaml
 collections:
   tcp_mem:
     command: cat /proc/sys/net/ipv4/tcp*mem

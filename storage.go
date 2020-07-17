@@ -55,7 +55,7 @@ func (db *DBStorage) CreateTable(tableName string, fields []MapValueField) {
 	db.Tables[tableName] = true
 }
 
-func (db *DBStorage) CreateRecord(tableName string, fields []MapValueField, values []string) error {
+func (db *DBStorage) CreateRecord(task *SchedulerTask, tableName string, fields []MapValueField, values []string) error {
 
 	var insertIntoDB = func(table string, fields []MapValueField, values []string) error {
 		log.Debugf("creating new record entry on table: %s", table)
@@ -80,9 +80,7 @@ func (db *DBStorage) CreateRecord(tableName string, fields []MapValueField, valu
 		}
 
 		dst.WriteString(strings.Join(formattedValues, ", ") + ");")
-		if err := db.Exec(dst.String()).Error; err != nil {
-			return err
-		}
+		*task.DBOpsQueue <- dst.String()
 		return nil
 	}
 

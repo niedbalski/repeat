@@ -51,3 +51,40 @@ collections:
       }
 
       device_stats
+
+  lxc_containers_memory_bytes:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: container
+            type: string
+            field-index: 0
+          - name: bytes
+            type: string
+            field-index: 1
+    script: |
+      #!/bin/bash
+        release=$(lsb_release -cs)
+
+        function memory_stats() {
+           if [ $release == "focal" ]; then
+            regexp='.*lxc.payload.*/memory.usage_in_bytes$'
+          else
+            regexp='.*lxc\/.*/memory.usage_in_bytes$'
+          fi
+
+          for f in $(find /sys/fs/cgroup/memory/ -maxdepth 2 -regextype posix-extended -regex ${regexp}); do
+            if [ $release == "focal" ]; then
+              container_name=$(echo $f | awk -F '/' '{split($(NF-1),a,"."); print a[3]}')
+            else
+              container_name=$(echo $f | awk -F '/' '{print $(NF-1)}')
+            fi
+            echo $container_name $(cat $f)
+          done
+      }
+
+      memory_stats
