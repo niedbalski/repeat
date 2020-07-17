@@ -1,5 +1,6 @@
 import:
   - ./collections/lxc.yaml
+  - ./collections/sockstat.yaml
 collections:
   tcp_mem:
     command: cat /proc/sys/net/ipv4/tcp*mem
@@ -36,19 +37,3 @@ collections:
           - name: pid
             type: string
             field-index: 1
-
-  sockstat_tcp:
-    command: grep -i tcp /proc/net/sockstat
-    run-every: 1s
-    exit-codes: any
-    store: database
-    database:
-      map-values:
-        field-separator: " "
-        fields:
-          - name: inuse
-            type: int
-            field-index: 2
-          - name: alloc
-            type: int
-            field-index: 8
