@@ -64,7 +64,7 @@ collections:
             type: string
             field-index: 0
           - name: bytes
-            type: string
+            type: int
             field-index: 1
     script: |
       #!/bin/bash

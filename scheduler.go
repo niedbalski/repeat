@@ -111,9 +111,15 @@ func (scheduler *Scheduler) LoadTasks() error {
 func (scheduler *Scheduler) TarballReport() error {
 	reportFileName := filepath.Join(scheduler.ResultsDir,
 		fmt.Sprintf("%sreport-%s.tar.gz", DEFAULT_REPORT_PREFIX, time.Now().Format("2006-01-02-15-04")))
-	filesToAppend, err := filepath.Glob(filepath.Join(scheduler.BaseDir, "/*"))
+	files, err := filepath.Glob(filepath.Join(scheduler.BaseDir, "/*"))
 	if err != nil {
 		return err
+	}
+	var filesToAppend []string
+	for _, file := range files {
+		if !strings.Contains(file, "db-journal") {
+			filesToAppend = append(filesToAppend, file)
+		}
 	}
 
 	log.Infof("Creating report tarball at: %s", reportFileName)
