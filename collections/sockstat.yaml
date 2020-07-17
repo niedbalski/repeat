@@ -1,0 +1,103 @@
+#sockets: used 1430
+#TCP: inuse 52 orphan 0 tw 4 alloc 107 mem 14
+#UDP: inuse 31 mem 29
+#UDPLITE: inuse 0
+#RAW: inuse 0
+#FRAG: inuse 0 memory 0
+collections:
+
+  total_sockets:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    command: "grep sockets /proc/net/sockstat"
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: count
+            type: int
+            field-index: 2
+
+  tcp_sockets:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    command: "grep -i tcp /proc/net/sockstat"
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+          - name: orphan
+            type: int
+            field-index: 4
+          - name: timewait
+            type: int
+            field-index: 6
+          - name: alloc
+            type: int
+            field-index: 8
+          - name: mem
+            type: int
+            field-index: 10
+
+  udp_sockets:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    command: "grep -i udp /proc/net/sockstat"
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+          - name: mem
+            type: int
+            field-index: 4
+
+  udp_lite_sockets:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    command: "grep -i udplite /proc/net/sockstat"
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+
+  raw_sockets:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    command: "grep -i raw /proc/net/sockstat"
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+
+  frag_sockets:
+    run-every: 1s
+    exit-codes: any
+    store: database
+    command: "grep -i udplite /proc/net/sockstat"
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: inuse
+            type: int
+            field-index: 2
+          - name: memory
+            type: int
+            field-index: 4
