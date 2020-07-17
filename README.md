@@ -133,7 +133,7 @@ Use this helper to generate dataframes from the report's tarball [pandas helper]
 *Note*: python3-sqlalchemy and pandas are required. (Ubuntu: apt install python3-sqlalchemy python3-pandas)
 
 
-![Getting data from a repeat report](repeat-pandas.png?raw=true "Title")
+![Getting data from a repeat report](repeat_pandas.png?raw=true "Title")
 
 ### Curated list of collections
 
