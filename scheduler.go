@@ -30,6 +30,7 @@ type Scheduler struct {
 	Timeout                    *time.Duration
 	DBDir, BaseDir, ResultsDir string
 	Tasks                      map[string]*SchedulerTask
+	DBOpsQueue                 *chan string
 }
 
 type SchedulerTask struct {
@@ -41,6 +42,7 @@ type SchedulerTask struct {
 	Job               *gocron.Job
 	BaseDir           string
 	DBStorage         *DBStorage
+	DBOpsQueue        *chan string
 }
 
 var Tempdir = ioutil.TempDir
@@ -65,6 +67,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir, result
 		return nil, err
 	}
 
+	opsQueue := make(chan string, 100)
 	scheduler.BaseDir = tempDir
 	scheduler.Pgid = pgid
 	scheduler.Config = config
@@ -72,6 +75,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir, result
 	scheduler.ResultsDir = resultsDir
 	scheduler.Tasks = make(map[string]*SchedulerTask)
 	scheduler.DBDir = dbDir
+	scheduler.DBOpsQueue = &opsQueue
 
 	storage, err := NewDBStorage(scheduler.BaseDir)
 	if err != nil {
@@ -96,7 +100,7 @@ func (scheduler *Scheduler) LoadTasks() error {
 	var err error
 
 	for name, collection := range scheduler.Config.Collections {
-		if task, err = NewSchedulerTask(name, scheduler.BaseDir, scheduler.Pgid, scheduler.DBDir, collection, scheduler.DBStorage); err != nil {
+		if task, err = NewSchedulerTask(name, scheduler.BaseDir, scheduler.Pgid, collection, scheduler.DBStorage, scheduler.DBOpsQueue); err != nil {
 			return err
 		}
 		scheduler.Tasks[name] = task
@@ -130,6 +134,8 @@ func (scheduler *Scheduler) Cleanup() error {
 	if err := os.RemoveAll(scheduler.BaseDir); err != nil {
 		return err
 	}
+	close(*scheduler.DBOpsQueue)
+
 	return nil
 }
 
@@ -212,20 +218,31 @@ func (scheduler *Scheduler) Start() error {
 		go scheduler.HandleTimeout()
 	}
 
+	go func(ch *chan string) {
+		for {
+			op := <-*ch
+			if err := scheduler.DBStorage.Exec(op).Error; err != nil {
+				log.Error(err)
+			}
+		}
+	}(scheduler.DBOpsQueue)
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
 	for range c {
 		if err := scheduler.Cleanup(); err != nil {
 			log.Errorf("Error during the cleanup phase: %s", err)
 		}
 		os.Exit(1)
 	}
+
 	return nil
 }
 
 var TempFile = ioutil.TempFile
 
-func NewSchedulerTask(name, baseDir string, pgid int, dbDir string, collection Collection, dBStorage *DBStorage) (*SchedulerTask, error) {
+func NewSchedulerTask(name, baseDir string, pgid int, collection Collection, dBStorage *DBStorage, dbOpsQueue *chan string) (*SchedulerTask, error) {
 	var task SchedulerTask
 	var command string
 
@@ -269,6 +286,7 @@ func NewSchedulerTask(name, baseDir string, pgid int, dbDir string, collection C
 	task.Name = name
 	task.Pgid = pgid
 	task.DBStorage = dBStorage
+	task.DBOpsQueue = dbOpsQueue
 	return &task, nil
 }
 
@@ -293,7 +311,7 @@ func (task *SchedulerTask) StoreResultsToDB(results []byte) error {
 		values := strings.Split(line, task.Config.Database.MapValues.Separator)
 		fields := task.Config.Database.MapValues.Fields
 		task.DBStorage.CreateTable(tableName, fields)
-		if err := task.DBStorage.CreateRecord(tableName, fields, values); err != nil {
+		if err := task.DBStorage.CreateRecord(task, tableName, fields, values); err != nil {
 			return err
 		}
 	}
