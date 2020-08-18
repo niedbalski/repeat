@@ -164,6 +164,9 @@ func LoadConfig(config *Config, urlFetcher func(url string) ([]byte, error)) err
 				log.Warnf("collection with name %s already exists, not added", name)
 				continue
 			}
+			if config.Collections == nil {
+				config.Collections = make(map[string]Collection)
+			}
 			if err := collection.SetDefaults(); err != nil {
 				return err
 			}
