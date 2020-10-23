@@ -1,0 +1,63 @@
+# Based on https://www.systutorials.com/docs/linux/man/8-lnstat/
+#$ lnstat -c -1 -i 1 -f arp_cache -d
+#/proc/net/stat/arp_cache:
+#	 1: entries
+#	 2: allocs
+#	 3: destroys
+#	 4: hash_grows
+#	 5: lookups
+#	 6: hits
+#	 7: res_failed
+#	 8: rcv_probes_mcast
+#	 9: rcv_probes_ucast
+#	10: periodic_gc_runs
+#	11: forced_gc_runs
+#	12: unresolved_discards
+#	13: table_fulls
+arp_cache:
+  run-every: 1s
+  exit-codes: any
+  store: database
+  database:
+    map-values:
+      field-separator: "|"
+      fields:
+        - name: entries
+          type: int
+          field-index: 0
+        - name: allocs
+          type: int
+          field-index: 1
+        - name: destroys
+          type: int
+          field-index: 2
+        - name: hash_grows
+          type: int
+          field-index: 3
+        - name: lookups
+          type: int
+          field-index: 4
+        - name: hits
+          type: int
+          field-index: 5
+        - name: res_failed
+          type: int
+          field-index: 6
+        - name: rcv_probes_mcast
+          type: int
+          field-index: 7
+        - name: rcv_probes_ucast
+          type: int
+          field-index: 8
+        - name: periodic_gc_runs
+          type: int
+          field-index: 9
+        - name: forced_gc_runs
+          type: int
+          field-index: 10
+        - name: unresolved_discards
+          type: int
+          field-index: 11
+        - name: table_fulls
+          type: int
+          field-index: 12
