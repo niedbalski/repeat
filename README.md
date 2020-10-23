@@ -5,6 +5,7 @@
 * Collections (command runs) can be run on a given time periodicity or a single shot.
 * Command output can be processed and stored on files or on a local database for further analysis. 
 * Collections can be shared through imports (local or via http[s]+)
+* Resulting data can be explored as pandas dataframes.
 * A compressed tarball report will be generated.
 
 ### Installation
