@@ -30,7 +30,7 @@ type Scheduler struct {
 	Timeout                    *time.Duration
 	DBDir, BaseDir, ResultsDir string
 	Tasks                      map[string]*SchedulerTask
-	DBOpsQueue                 *chan string
+	DBOpsQueue                 *chan *InsertRecord
 }
 
 type SchedulerTask struct {
@@ -42,10 +42,12 @@ type SchedulerTask struct {
 	Job               *gocron.Job
 	BaseDir           string
 	DBStorage         *DBStorage
-	DBOpsQueue        *chan string
+	DBOpsQueue        *chan *InsertRecord
 }
 
 var Tempdir = ioutil.TempDir
+
+const DefaultOpsQueueSize = 100000000
 
 func NewScheduler(configFilename string, timeout *time.Duration, baseDir, resultsDir, dbDir string) (*Scheduler, error) {
 	var scheduler Scheduler
@@ -67,7 +69,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir, result
 		return nil, err
 	}
 
-	opsQueue := make(chan string, 100)
+	opsQueue := make(chan *InsertRecord, DefaultOpsQueueSize)
 	scheduler.BaseDir = tempDir
 	scheduler.Pgid = pgid
 	scheduler.Config = config
@@ -207,6 +209,45 @@ func (scheduler *Scheduler) RunTask(task *SchedulerTask) error {
 	return nil
 }
 
+func (scheduler *Scheduler) WaitForRecordsToInsert(ch *chan *InsertRecord) {
+	var RecordsMap = make(map[string][]*InsertRecord)
+	for {
+		record := <-*ch
+		RecordsMap[record.TableName] = append(RecordsMap[record.TableName], record)
+
+		batchSize := scheduler.Config.Collections[record.TableName].BatchSize
+		log.Tracef("Records on table %s -- records: %d - batchsize: %d", record.TableName, len(RecordsMap[record.TableName]), batchSize)
+
+		if len(RecordsMap[record.TableName]) >= batchSize {
+
+			var dst strings.Builder
+
+			dst.WriteString("INSERT INTO ")
+			dst.WriteString("main." + record.TableName)
+			dst.WriteString(" (")
+			dst.WriteString(strings.Join(record.FieldNames, ", "))
+			dst.WriteString(") VALUES ")
+
+			for i, r := range RecordsMap[record.TableName] {
+				dst.WriteString("(" + strings.Join(r.Values, ", ") + ")")
+				if i == len(RecordsMap[record.TableName])-1 {
+					dst.WriteString(";")
+				} else {
+					dst.WriteString(",")
+				}
+			}
+
+			if err := scheduler.DBStorage.Exec(dst.String()).Error; err != nil {
+				log.Errorf("Error executing database query: %s - error: %s", dst.String(), err)
+			}
+
+			log.Debugf("Remaining elements on channel to be processed: %d", len(*ch))
+			log.Tracef("Executed query: %s", dst.String())
+			RecordsMap[record.TableName] = make([]*InsertRecord, 0)
+		}
+	}
+}
+
 func (scheduler *Scheduler) Start() error {
 
 	for name, task := range scheduler.Tasks {
@@ -224,14 +265,7 @@ func (scheduler *Scheduler) Start() error {
 		go scheduler.HandleTimeout()
 	}
 
-	go func(ch *chan string) {
-		for {
-			op := <-*ch
-			if err := scheduler.DBStorage.Exec(op).Error; err != nil {
-				log.Error(err)
-			}
-		}
-	}(scheduler.DBOpsQueue)
+	go scheduler.WaitForRecordsToInsert(scheduler.DBOpsQueue)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -248,7 +282,7 @@ func (scheduler *Scheduler) Start() error {
 
 var TempFile = ioutil.TempFile
 
-func NewSchedulerTask(name, baseDir string, pgid int, collection Collection, dBStorage *DBStorage, dbOpsQueue *chan string) (*SchedulerTask, error) {
+func NewSchedulerTask(name, baseDir string, pgid int, collection Collection, dBStorage *DBStorage, dbOpsQueue *chan *InsertRecord) (*SchedulerTask, error) {
 	var task SchedulerTask
 	var command string
 

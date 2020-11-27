@@ -1,0 +1,51 @@
+collections:
+
+  etcd:
+    batch-size: 10000
+    run-every: 5s
+    exit-codes: 0
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: unit
+            type: string
+            field-index: 0
+          - name: metric
+            type: string
+            field-index: 1
+          - name: value
+            type: int
+            field-index: 2
+    script: |
+      #!/bin/bash
+      for unit in $(juju status --format=json | jq -r '.applications."etcd".units | keys[]'); do
+        juju run --unit $unit "sudo curl -Ss -k --cert /var/snap/etcd/common/server.crt --key /var/snap/etcd/common/server.key https://localhost:2379/metrics" -o json | sed 's/#.*//' | awk -v unit=$unit 'NF { print unit " " $0; }';
+      done
+
+  kubeapi_server:
+    batch-size: 10000
+    run-every: 5s
+    exit-codes: 0
+    store: database
+    database:
+      map-values:
+        field-separator: " "
+        fields:
+          - name: metric
+            type: string
+            field-index: 0
+          - name: value
+            type: int
+            field-index: 1
+    script: |
+      #!/bin/bash
+      $(kubectl apply -f https://gist.githubusercontent.com/brettmilford/17fb21bfc3e81204822c445e83dcab19/raw/318aaaef000f6f244fccc601689661c03e2f9dcd/metrics-role.yaml  > /dev/null 2>&1)
+
+      CLUSTER_NAME="juju-cluster"
+      APISERVER=$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$CLUSTER_NAME\")].cluster.server}")
+      TOKEN=$(kubectl get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='default')].data.token}"|base64 --decode)
+
+      curl --fail -s -X GET "${APISERVER}/metrics" --header "Authorization: Bearer $TOKEN" --insecure | sed 's/#.*//' | grep -v -i nan | awk 'NF>=2{ print $0; }'
+      exit $?

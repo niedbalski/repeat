@@ -7,7 +7,6 @@ import (
 	dynamicstruct "github.com/ompluscator/dynamic-struct"
 	log "github.com/sirupsen/logrus"
 	"path"
-	"strings"
 )
 
 type DBStorage struct {
@@ -55,32 +54,34 @@ func (db *DBStorage) CreateTable(tableName string, fields []MapValueField) {
 	db.Tables[tableName] = true
 }
 
+type InsertRecord struct {
+	TableName  string
+	FieldNames []string
+	Values     []string
+}
+
 func (db *DBStorage) CreateRecord(task *SchedulerTask, tableName string, fields []MapValueField, values []string) error {
 
 	var insertIntoDB = func(table string, fields []MapValueField, values []string) error {
+		if table == "" || fields == nil || values == nil {
+			return fmt.Errorf("Skipping data insertion, nil values passed to insertIntoDb")
+		}
+
 		log.Debugf("creating new record entry on table: %s", table)
 		var fieldNames []string
 		var formattedValues []string
-		var dst strings.Builder
 
 		fieldNames = append(fieldNames, "created_at")
 		for _, field := range fields {
 			fieldNames = append(fieldNames, field.Name)
 		}
 
-		dst.WriteString("INSERT INTO ")
-		dst.WriteString("main." + table)
-		dst.WriteString(" (")
-		dst.WriteString(strings.Join(fieldNames, ", "))
-		dst.WriteString(") VALUES (")
-
 		formattedValues = append(formattedValues, "datetime('now')")
 		for _, field := range fields {
 			formattedValues = append(formattedValues, field.Format(values))
 		}
 
-		dst.WriteString(strings.Join(formattedValues, ", ") + ");")
-		*task.DBOpsQueue <- dst.String()
+		*task.DBOpsQueue <- &InsertRecord{FieldNames: fieldNames, Values: formattedValues, TableName: table}
 		return nil
 	}
 
