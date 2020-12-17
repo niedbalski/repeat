@@ -64,6 +64,7 @@ type Collection struct {
 	Command   string   `yaml:"command"`
 	RunEvery  string   `yaml:"run-every" default:"0s"`
 	Timeout   string   `yaml:"timeout" default:"0s"`
+	BatchSize int      `yaml:"batch-size" default:"1"`
 	RunOnce   bool     `yaml:"run-once" default:"false"`
 	Script    string   `yaml:"script"`
 	ExitCodes string   `yaml:"exit-codes" default:"any"`
