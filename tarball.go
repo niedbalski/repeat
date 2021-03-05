@@ -40,6 +40,10 @@ func addFileToTarWriter(filePath string, tarWriter *tar.Writer) error {
 	}
 	defer file.Close()
 
+	if err = file.Sync(); err != nil {
+		return err
+	}
+
 	stat, err := file.Stat()
 	if err != nil {
 		return fmt.Errorf("Could not get stat for file '%s', got error '%s'", filePath, err.Error())

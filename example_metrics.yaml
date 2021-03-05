@@ -1,13 +1,8 @@
 import:
   - ./collections/lxc.yaml
   - ./collections/sockstat.yaml
+  - ./collections/netstat.yaml
 collections:
-  tcp_mem:
-    command: cat /proc/sys/net/ipv4/tcp*mem
-    run-every: 2s
-    exit-codes: 0
-
-  # scripts can be defined inline
   sar:
     run-once: true
     exit-codes: 0 127 126
@@ -18,11 +13,8 @@ collections:
 
   process_list:
     command: ps aux --no-headers
-    run-every: 1s
+    run-every: 10s
     exit-codes: any
-    # store type database, will create a table in the collections database
-    # and use the map-values definition to populate each column for th given
-    # command output
     store: database
     database:
       map-values:

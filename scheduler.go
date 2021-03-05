@@ -31,6 +31,7 @@ type Scheduler struct {
 	DBDir, BaseDir, ResultsDir string
 	Tasks                      map[string]*SchedulerTask
 	DBOpsQueue                 *chan *InsertRecord
+	Stopped                    bool
 }
 
 type SchedulerTask struct {
@@ -43,6 +44,7 @@ type SchedulerTask struct {
 	BaseDir           string
 	DBStorage         *DBStorage
 	DBOpsQueue        *chan *InsertRecord
+	Scheduler         *Scheduler
 }
 
 var Tempdir = ioutil.TempDir
@@ -70,6 +72,7 @@ func NewScheduler(configFilename string, timeout *time.Duration, baseDir, result
 	}
 
 	opsQueue := make(chan *InsertRecord, DefaultOpsQueueSize)
+
 	scheduler.BaseDir = tempDir
 	scheduler.Pgid = pgid
 	scheduler.Config = config
@@ -102,7 +105,7 @@ func (scheduler *Scheduler) LoadTasks() error {
 	var err error
 
 	for name, collection := range scheduler.Config.Collections {
-		if task, err = NewSchedulerTask(name, scheduler.BaseDir, scheduler.Pgid, collection, scheduler.DBStorage, scheduler.DBOpsQueue); err != nil {
+		if task, err = NewSchedulerTask(name, collection, scheduler); err != nil {
 			return err
 		}
 		scheduler.Tasks[name] = task
@@ -133,7 +136,13 @@ func (scheduler *Scheduler) TarballReport() error {
 
 func (scheduler *Scheduler) Cleanup() error {
 	log.Info("Cleaning up resources")
+
 	scheduler.GoCronScheduler.Clear()
+	scheduler.GoCronScheduler.Stop()
+	scheduler.Stopped = true
+
+	close(*scheduler.DBOpsQueue)
+
 	if err := scheduler.TarballReport(); err != nil {
 		return err
 	}
@@ -142,7 +151,6 @@ func (scheduler *Scheduler) Cleanup() error {
 	if err := os.RemoveAll(scheduler.BaseDir); err != nil {
 		return err
 	}
-	close(*scheduler.DBOpsQueue)
 
 	return nil
 }
@@ -178,7 +186,6 @@ func (scheduler *Scheduler) RunTask(task *SchedulerTask) error {
 	var output []byte
 	var err error
 
-	// If its a run-once job, only run it once and then discard the job from the scheduler.
 	if task.Config.RunOnce {
 		scheduler.RemoveTask(task.Name)
 	}
@@ -213,15 +220,15 @@ func (scheduler *Scheduler) WaitForRecordsToInsert(ch *chan *InsertRecord) {
 	var RecordsMap = make(map[string][]*InsertRecord)
 	for {
 		record := <-*ch
+		if record == nil {
+			continue
+		}
 		RecordsMap[record.TableName] = append(RecordsMap[record.TableName], record)
-
 		batchSize := scheduler.Config.Collections[record.TableName].BatchSize
 		log.Tracef("Records on table %s -- records: %d - batchsize: %d", record.TableName, len(RecordsMap[record.TableName]), batchSize)
 
-		if len(RecordsMap[record.TableName]) >= batchSize {
-
+		if len(RecordsMap[record.TableName]) >= batchSize || scheduler.Stopped {
 			var dst strings.Builder
-
 			dst.WriteString("INSERT INTO ")
 			dst.WriteString("main." + record.TableName)
 			dst.WriteString(" (")
@@ -238,7 +245,7 @@ func (scheduler *Scheduler) WaitForRecordsToInsert(ch *chan *InsertRecord) {
 			}
 
 			if err := scheduler.DBStorage.Exec(dst.String()).Error; err != nil {
-				log.Errorf("Error executing database query: %s - error: %s", dst.String(), err)
+				log.Errorf("Error executing database query: %s", err)
 			}
 
 			log.Debugf("Remaining elements on channel to be processed: %d", len(*ch))
@@ -249,7 +256,6 @@ func (scheduler *Scheduler) WaitForRecordsToInsert(ch *chan *InsertRecord) {
 }
 
 func (scheduler *Scheduler) Start() error {
-
 	for name, task := range scheduler.Tasks {
 		log.Infof("Scheduling run of %s collector every %f secs", name, task.RunEvery.Seconds())
 		job, err := scheduler.GoCronScheduler.Every(uint64(task.RunEvery.Seconds())).Seconds().StartImmediately().Do(scheduler.RunTask, task)
@@ -276,13 +282,12 @@ func (scheduler *Scheduler) Start() error {
 		}
 		os.Exit(1)
 	}
-
 	return nil
 }
 
 var TempFile = ioutil.TempFile
 
-func NewSchedulerTask(name, baseDir string, pgid int, collection Collection, dBStorage *DBStorage, dbOpsQueue *chan *InsertRecord) (*SchedulerTask, error) {
+func NewSchedulerTask(name string, collection Collection, scheduler *Scheduler) (*SchedulerTask, error) {
 	var task SchedulerTask
 	var command string
 
@@ -301,7 +306,7 @@ func NewSchedulerTask(name, baseDir string, pgid int, collection Collection, dBS
 	}
 
 	if collection.Script != "" {
-		fd, err := TempFile(baseDir, "run-script-")
+		fd, err := TempFile(scheduler.BaseDir, "run-script-")
 		if err != nil {
 			return nil, err
 		}
@@ -318,15 +323,16 @@ func NewSchedulerTask(name, baseDir string, pgid int, collection Collection, dBS
 		command = collection.Command
 	}
 
-	task.BaseDir = baseDir
+	task.BaseDir = scheduler.BaseDir
 	task.Command = command
 	task.Timeout = taskTimeout
 	task.RunEvery = runEvery
 	task.Config = collection
 	task.Name = name
-	task.Pgid = pgid
-	task.DBStorage = dBStorage
-	task.DBOpsQueue = dbOpsQueue
+	task.Pgid = scheduler.Pgid
+	task.DBStorage = scheduler.DBStorage
+	task.DBOpsQueue = scheduler.DBOpsQueue
+	task.Scheduler = scheduler
 	return &task, nil
 }
 

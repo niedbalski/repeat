@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -24,6 +25,15 @@ func (field *MapValueField) Format(values []string) string {
 	switch field.Type {
 	case "string":
 		return "'" + values[field.Index] + "'"
+	case "int":
+		if len(values) < field.Index {
+			return "0"
+		}
+		_, err := strconv.Atoi(values[field.Index])
+		if err != nil {
+			return "0"
+		}
+		return values[field.Index]
 	default:
 		return values[field.Index]
 	}
