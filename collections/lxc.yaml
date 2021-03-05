@@ -1,6 +1,6 @@
 collections:
   lxc_containers_io_bytes:
-    run-every: 1m
+    run-every: 10s
     exit-codes: any
     store: database
     database:
@@ -57,7 +57,7 @@ collections:
       device_stats
 
   lxc_containers_memory_bytes:
-    run-every: 1m
+    run-every: 10s
     exit-codes: any
     store: database
     database:

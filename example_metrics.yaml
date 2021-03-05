@@ -8,8 +8,7 @@ collections:
     exit-codes: 0 127 126
     script: |
       #!/bin/bash
-
-      echo "testing"
+      sudo sar -A 1 -o $(hostname)-hypervisor.sar
 
   process_list:
     command: ps aux --no-headers

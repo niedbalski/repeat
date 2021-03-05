@@ -7,7 +7,7 @@
 collections:
 
   total_sockets:
-    run-every: 1m
+    run-every: 10s
     exit-codes: any
     store: database
     command: "grep sockets /proc/net/sockstat"
@@ -20,7 +20,7 @@ collections:
             field-index: 2
 
   tcp_sockets:
-    run-every: 1s
+    run-every: 10s
     exit-codes: any
     store: database
     command: "grep -i tcp /proc/net/sockstat"
@@ -45,7 +45,7 @@ collections:
             field-index: 10
 
   udp_sockets:
-    run-every: 1s
+    run-every: 10s
     exit-codes: any
     store: database
     command: "grep -i udp /proc/net/sockstat"
@@ -61,7 +61,7 @@ collections:
             field-index: 4
 
   udp_lite_sockets:
-    run-every: 1s
+    run-every: 10s
     exit-codes: any
     store: database
     command: "grep -i udplite /proc/net/sockstat"
@@ -74,7 +74,7 @@ collections:
             field-index: 2
 
   raw_sockets:
-    run-every: 1s
+    run-every: 1m
     exit-codes: any
     store: database
     command: "grep -i raw /proc/net/sockstat"
@@ -87,7 +87,7 @@ collections:
             field-index: 2
 
   frag_sockets:
-    run-every: 1s
+    run-every: 10s
     exit-codes: any
     store: database
     command: "grep -i udplite /proc/net/sockstat"
