@@ -63,13 +63,13 @@ type InsertRecord struct {
 func (db *DBStorage) CreateRecord(task *SchedulerTask, tableName string, fields []MapValueField, values []string) error {
 
 	var insertIntoDB = func(table string, fields []MapValueField, values []string) error {
+		var fieldNames, formattedValues []string
+
 		if table == "" || fields == nil || values == nil {
 			return fmt.Errorf("Skipping data insertion, nil values passed to insertIntoDb")
 		}
 
 		log.Debugf("creating new record entry on table: %s", table)
-		var fieldNames []string
-		var formattedValues []string
 
 		fieldNames = append(fieldNames, "created_at")
 		for _, field := range fields {
@@ -81,7 +81,9 @@ func (db *DBStorage) CreateRecord(task *SchedulerTask, tableName string, fields 
 			formattedValues = append(formattedValues, field.Format(values))
 		}
 
-		*task.DBOpsQueue <- &InsertRecord{FieldNames: fieldNames, Values: formattedValues, TableName: table}
+		if !task.Scheduler.Stopped {
+			*task.DBOpsQueue <- &InsertRecord{FieldNames: fieldNames, Values: formattedValues, TableName: table}
+		}
 		return nil
 	}
 
@@ -97,14 +99,11 @@ func (db *DBStorage) CreateRecord(task *SchedulerTask, tableName string, fields 
 	}
 
 	RemoveEmptyFromSlice(&values)
-
 	if len(values) <= 0 {
 		return fmt.Errorf("Empty set of values returned, skipping")
 	}
-
 	if err := isIndexOnValues(values); err != nil {
 		return err
 	}
-
 	return insertIntoDB(tableName, fields, values)
 }

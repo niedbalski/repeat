@@ -7,7 +7,7 @@
 collections:
 
   total_sockets:
-    run-every: 1s
+    run-every: 1m
     exit-codes: any
     store: database
     command: "grep sockets /proc/net/sockstat"

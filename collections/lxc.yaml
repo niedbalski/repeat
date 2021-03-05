@@ -1,6 +1,6 @@
 collections:
   lxc_containers_io_bytes:
-    run-every: 1s
+    run-every: 1m
     exit-codes: any
     store: database
     database:
@@ -43,6 +43,10 @@ collections:
             else
               container_name=$(echo $f | awk -F '/' '{print $(NF-1)}')
             fi
+            if [[ $container_name == "" ]]; then
+              container_name="host"
+            fi
+
             grep -E '(Read|Write)' $f | while read -r line; do
               set -- $(awk 'match($1, /[0-9]+:[0-9]+$/) { split($1, d, ":"); print d[1], d[2], $2, $3 }'<<<$line)
               echo $container_name $(echo $(device_path $1 $2) | cut -d" " -f1) ${3,,} $4
@@ -53,7 +57,7 @@ collections:
       device_stats
 
   lxc_containers_memory_bytes:
-    run-every: 1s
+    run-every: 1m
     exit-codes: any
     store: database
     database:
@@ -83,6 +87,11 @@ collections:
             else
               container_name=$(echo $f | awk -F '/' '{print $(NF-1)}')
             fi
+
+            if [[ $container_name == "" ]]; then
+              container_name="host"
+            fi
+
             echo $container_name $(cat $f)
           done
       }
