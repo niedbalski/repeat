@@ -70,6 +70,7 @@ func (c *DBConfig) SetDefaults() error {
 	return nil
 }
 
+
 type Collection struct {
 	Command   string   `yaml:"command"`
 	RunEvery  string   `yaml:"run-every" default:"0s"`
